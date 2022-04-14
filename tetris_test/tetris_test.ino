@@ -1,3 +1,4 @@
+//#include <MsTimer2.h>
 
 // TETRIS
 #include <FastLED.h>
@@ -5,13 +6,13 @@
 #include <LEDSprites.h>
 #include <LEDText.h>
 #include <FontMatrise.h>
-//#include "BluetoothSerial.h"
+#include "BluetoothSerial.h"
 
 #define LED_PIN        13 //13번 핀 사용
 #define COLOR_ORDER    GRB //컬러
 #define CHIPSET        WS2812B //3색 LED
 #define MATRIX_WIDTH   8
-#define MATRIX_HEIGHT  32
+#define MATRIX_HEIGHT  10
 #define MATRIX_TYPE    HORIZONTAL_MATRIX
 
 // NOTE the '-' sign before the width, this is due to my leds matrix origin being on the right hand side
@@ -20,7 +21,7 @@ cLEDMatrix<MATRIX_WIDTH, -MATRIX_HEIGHT, MATRIX_TYPE> leds;
 //BluetoothSerial SerialBT;
 
 #define TARGET_FRAME_TIME    15  // Desired update rate, though if too many leds it will just run as fast as it can!
-#define INITIAL_DROP_FRAMES  20  // Start of game block drop delay in frames
+int INITIAL_DROP_FRAMES = 40;  // Start of game block drop delay in frames
 
 // Bluetooth input
 enum btnInput {NONE, ROTATE, DOWN, LEFT, RIGHT};
@@ -351,7 +352,7 @@ const uint8_t TetrisZMask[] =
 
 #define TETRIS_SPR_WIDTH  4
 #define TETRIS_SPR_HEIGHT 4
-const uint8_t *TetrisSprData[] = { TetrisIData, TetrisJData, TetrisLData, TetrisOData, TetrisSData, TetrisTData, TetrisZData };
+const uint8_t *TetrisSprData[] = { TetrisIData, TetrisJData, TetrisLData, TetrisOData, TetrisSData, TetrisTData, TetrisZData };//I : 1자 블록, J, L : 방향 다른 ㄱ블록, O : ㅁ블록, S, Z : 꾸불꾸불 불럭, T : ㅗ 블럭
 const uint8_t *TetrisSprMask[] = { TetrisIMask, TetrisJMask, TetrisLMask, TetrisOMask, TetrisSMask, TetrisTMask, TetrisZMask};
 const struct CRGB TetrisColours[] = { CRGB(0, 255, 255), CRGB(0, 0, 255), CRGB(255, 165, 0), CRGB(255, 255, 0), CRGB(50, 205, 50), CRGB(255, 0, 255), CRGB(255, 0, 0) };//테트리스 블럭 색 지정
 
@@ -377,7 +378,7 @@ uint32_t LoopDelayMS, LastLoop;
 void setup()
 {
   Serial.begin(115200);
-//  SerialBT.begin("ESP32Tetris");
+  //SerialBT.begin("Uno_test");
   
   FastLED.addLeds<CHIPSET, LED_PIN, COLOR_ORDER>(leds[0], leds.Size());
   FastLED.setBrightness(20); //밝기
@@ -409,7 +410,14 @@ void setup()
   LastLoop = millis() - LoopDelayMS;
 //  PlasmaShift = (random8(0, 5) * 32) + 64;
 //  PlasmaTime = 0;
+//  MsTimer2::set(2000,Level_Up);//2초 주기
+//  MsTimer2::start();
 }
+//void Level_Up(){
+//  if(INITIAL_DROP_FRAMES > 0){
+//    INITIAL_DROP_FRAMES-=2;
+//  }
+//}
 
 void loop()
 {
@@ -417,7 +425,7 @@ void loop()
   {
     LastLoop = millis();
     FastLED.clear();
-
+    
     // Fill background with dim plasma 백그라운드 배경
 //    #define PLASMA_X_FACTOR  24
 //    #define PLASMA_Y_FACTOR  24
@@ -490,7 +498,7 @@ void loop()
         if (CurrentBlock.GetXChange() >= 0) // We have a current block
         {
           // Check for user input
-          if ( currentInput == ROTATE )
+          if ( currentInput == ROTATE )//블럭 회전
           {
             currentInput = NONE;
             if ((CurrentBlock.GetCurrentFrame() % 2) == 1)
@@ -506,16 +514,16 @@ void loop()
               CurrentBlock.DecreaseFrame();
           }
           
-          if ( currentInput == LEFT && (! (CurrentBlock.GetFlags() & SPRITE_EDGE_X_MIN)) )
+          if ( currentInput == LEFT && (! (CurrentBlock.GetFlags() & SPRITE_EDGE_X_MIN)) ) //블럭 왼쪽 이동
           {
             currentInput = NONE;
             CurrentBlock.m_X--;
             Sprites.DetectCollisions(&CurrentBlock);
-            if (CurrentBlock.GetFlags() & SPRITE_COLLISION)
+            if (CurrentBlock.GetFlags() & SPRITE_COLLISION)//COLLISION : 충돌, 블럭 충돌되면
               CurrentBlock.m_X++;
           }
           
-          else if ( currentInput == RIGHT && (! (CurrentBlock.GetFlags() & SPRITE_EDGE_X_MAX)) )
+          else if ( currentInput == RIGHT && (! (CurrentBlock.GetFlags() & SPRITE_EDGE_X_MAX)) )//블럭 오른쪽 이동
           {
             currentInput = NONE;
             CurrentBlock.m_X++;
@@ -564,9 +572,14 @@ void loop()
                   {
                     HighScore = LastScore;
                     sprintf((char *)GameOverMsg, "%sGAME OVER%sNEW HIGH SCORE %u%s", BlankMsg, BlankMsg, LastScore, BlankMsg);
+                    //Serial.println(HighScroe);
                   }
                   else
                     sprintf((char *)GameOverMsg, "%sGAME OVER%sSCORE %u%s", BlankMsg, BlankMsg, LastScore, BlankMsg);
+
+                  String score = HighScore+"&"+LastScore; //메시지 파싱 위한
+                  Serial.println(score); //시리얼 통신
+                      
                   sprintf((char *)AttractMsg, "%sTETRIS%sSCORE %u%sHIGH %u%sANY BUTTON TO START%s", BlankMsg, BlankMsg, LastScore, BlankMsg, HighScore, BlankMsg, BlankMsg);
                   TetrisMsg.SetText(GameOverMsg, strlen((char *)GameOverMsg));
                   TetrisMsg.SetBackgroundMode(BACKGND_DIMMING, 0x40);
@@ -645,7 +658,8 @@ void loop()
     FastLED.show();
   }
   if(Serial.available()){
-    char keyPress = (char)Serial.read();
+    char keyPress = Serial.read(); //조이스틱 값 받아 옴
+    Serial.println("data : "+Serial.read());
     switch(keyPress) {
       case 'w':
         currentInput = ROTATE; //모양 변경
@@ -660,6 +674,8 @@ void loop()
         currentInput = RIGHT; //오른쪽으로 이동
         break;
     }
+    Serial.print("data is : ");
     Serial.println(currentInput);
   }
+  
 }
