@@ -1,4 +1,4 @@
-const int duration = 200; //1초동안 채터링 현상을 무시, 1초동안 스위치를 아무리 눌러도 반응 안함
+const int duration = 10000; //1초동안 채터링 현상을 무시, 1초동안 스위치를 아무리 눌러도 반응 안함
 unsigned long pre_time = 0;
 unsigned long cur_time = 0;
 volatile byte state = HIGH;

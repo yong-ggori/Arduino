@@ -6,7 +6,9 @@
 #include <LEDSprites.h>
 #include <LEDText.h>
 #include <FontMatrise.h>
-#include "BluetoothSerial.h"
+#include <HardwareSerial.h>
+//#include "BluetoothSerial.h"
+HardwareSerial mySerial(2);
 
 #define LED_PIN        13 //13번 핀 사용
 #define COLOR_ORDER    GRB //컬러
@@ -381,11 +383,14 @@ const int duration = 10000; //1초동안 채터링 현상을 무시, 1초동안 
 unsigned long pre_time = 0;
 unsigned long cur_time = 0;
 ////////////////////////////////////////////////////// level 조정, 블럭 드랍 프레임 조정
+#define GAME_STATE 14
 
 void setup()
 {
   Serial.begin(115200);
   //SerialBT.begin("Uno_test");
+  mySerial.begin(115200, SERIAL_8N1, 34, 35);//RX : 34, TX : 35
+  pinMode(GAME_STATE, LOW);
 
   FastLED.addLeds<CHIPSET, LED_PIN, COLOR_ORDER>(leds[0], leds.Size());
   FastLED.setBrightness(10); //밝기
@@ -481,6 +486,7 @@ void loop()
     {
       Level_Up();//INITIAL_DROP_FRAMES 블럭 드롭 프레임, 낮으면 빨라진다.
       state = 1;//game start 상태 알림
+      digitalWrite(GAME_STATE, HIGH);
 
       if (Sprites.IsSprite(&CompletedLines))  // We have highlighted complete lines, delay for visual effect
       {
@@ -521,6 +527,7 @@ void loop()
           // Check for user input
           if ( currentInput == ROTATE )//블럭 회전
           {
+            Serial.println(CurrentBlock.GetXChange());
             currentInput = NONE;
             if ((CurrentBlock.GetCurrentFrame() % 2) == 1)
             {
@@ -588,6 +595,7 @@ void loop()
                 {
                   // Game over
                   state = 0; //게임오버 상태 알림
+                  digitalWrite(GAME_STATE, LOW);
                   INITIAL_DROP_FRAMES = 40; //드랍 프레임 초기화
 
                   CurrentBlock.SetYCounter(2);  // Stop last block moving down!
@@ -600,10 +608,7 @@ void loop()
                   }
                   else
                     sprintf((char *)GameOverMsg, "%sGAME OVER%sSCORE %u%s", BlankMsg, BlankMsg, LastScore, BlankMsg);
-
-                  //                  String score = HighScore+"&"+LastScore; //메시지 파싱 위한
-                  //                  Serial.println(score); //시리얼 통신
-
+  
                   sprintf((char *)AttractMsg, "%sTETRIS%sSCORE %u%sHIGH %u%sANY BUTTON TO START%s", BlankMsg, BlankMsg, LastScore, BlankMsg, HighScore, BlankMsg, BlankMsg);
                   TetrisMsg.SetText(GameOverMsg, strlen((char *)GameOverMsg));
                   TetrisMsg.SetBackgroundMode(BACKGND_DIMMING, 0x40);
@@ -682,9 +687,9 @@ void loop()
     }
     FastLED.show();
   }
-  if (Serial.available()) {
+  if (mySerial.available() > 0) {
 
-    char keyPress = Serial.read(); //조이스틱 값 받아 옴
+    char keyPress = mySerial.read(); //조이스틱 값 받아 옴
     //    Serial.println("data : "+keyPress);
     switch (keyPress) {
       case 'w':
@@ -700,8 +705,8 @@ void loop()
         currentInput = RIGHT; //오른쪽으로 이동
         break;
     }
-        Serial.print("data is : ");
-        Serial.println(currentInput);
+    //    Serial.print("data is : ");
+    //    Serial.println(currentInput);
   }
 
 
